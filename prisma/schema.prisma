@@ -1,0 +1,487 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER & AUTH ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  password      String?   // For email/password auth
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Stats
+  totalWorkouts  Int       @default(0)
+  lastWorkoutAt  DateTime?
+
+  // Relations
+  accounts        Account[]
+  sessions        Session[]
+  profiles        TrainingProfile[]
+  plans           WorkoutPlan[]
+  progressLogs    ProgressLog[]
+  subscriptions   Subscription[]
+  aiUsageLogs     AiUsageLog[]
+  chatMessages    ChatMessage[]
+  workoutLogs     WorkoutLog[]
+  personalRecords PersonalRecord[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==================== TRAINING PROFILE ====================
+
+model TrainingProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  // Basic Info
+  age           Int
+  biologicalSex String
+  heightCm      Float
+  weightKg      Float
+  trainingAge   String
+
+  // Availability
+  daysPerWeek        Int
+  sessionDurationMin Int
+  preferredTime      String
+  trainingLocation   String
+
+  // Equipment (stored as JSON string for SQLite compatibility)
+  equipment String // JSON: { pullUpBar: true, rings: false, ... }
+
+  // Goals
+  goalPrimary   String
+  goalSecondary String?
+  goalTertiary  String?
+
+  // Injury Screen
+  hasCurrentPain Boolean @default(false)
+  painAreas      String  @default("[]") // JSON array: ["shoulder", "wrist"]
+  painSeverity   Int?
+
+  // Computed forbidden tags
+  avoidTags String @default("[]") // JSON array: ["overhead_pressing", "wrist_extension"]
+
+  // Baseline
+  maxPushups           String? // Can be number or "cannot_do"
+  maxPullups           String? // Can be number, "cannot_do", or "no_bar"
+  maxDips              String? // Can be number, "cannot_do", or "no_station"
+  plankHoldSec         Int?
+  hollowHoldSec        String? // Can be number or "unfamiliar"
+  wallHandstandHoldSec String? // Can be number, "cannot_do", or "never_tried"
+
+  // Computed
+  fitnessLevel String // "beginner" | "intermediate" | "advanced"
+  flags        String @default("[]") // JSON array
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plans     WorkoutPlan[]
+  equipment_items UserEquipment[]
+
+  @@index([userId, isActive])
+  @@index([userId, version])
+}
+
+model UserEquipment {
+  id        String @id @default(cuid())
+  profileId String
+  equipment String
+
+  profile TrainingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, equipment])
+  @@index([equipment])
+}
+
+// ==================== WORKOUT PLAN ====================
+
+model WorkoutPlan {
+  id              String   @id @default(cuid())
+  userId          String
+  profileId       String
+  profileVersion  Int
+  promptVersion   String
+  createdAt       DateTime @default(now())
+  validUntil      DateTime
+  isActive        Boolean  @default(true)
+
+  // Metadata
+  totalWeeklyVolume Int
+  pushPullRatio     Float
+  skillFocus        String @default("[]") // JSON array
+  avoidedMovements  String @default("[]") // JSON array
+
+  // Source
+  generationType String // "ai_generated" | "template" | "ai_enhanced_template"
+  templateId     String?
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile TrainingProfile @relation(fields: [profileId], references: [id])
+  days    WorkoutDay[]
+  logs    ProgressLog[]
+
+  @@index([userId, isActive])
+  @@index([profileId])
+}
+
+model WorkoutDay {
+  id               String @id @default(cuid())
+  planId           String
+  dayNumber        Int
+  dayType          String
+  totalDurationMin Int
+
+  plan        WorkoutPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  blocks      ExerciseBlock[]
+  workoutLogs WorkoutLog[]
+
+  @@index([planId])
+}
+
+model ExerciseBlock {
+  id          String @id @default(cuid())
+  dayId       String
+  blockType   String
+  durationMin Int
+  orderIndex  Int
+
+  day       WorkoutDay        @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  exercises PlannedExercise[]
+
+  @@index([dayId])
+}
+
+model PlannedExercise {
+  id         String @id @default(cuid())
+  blockId    String
+  exerciseId String
+  orderIndex Int
+
+  sets    Int
+  reps    String
+  restSec Int
+  tempo   String?
+  intensity String // JSON: { type: "rir", value: 2 }
+  notes   String?
+
+  progressionRule     String?
+  progressionExercise String?
+  regressionExercise  String?
+  regressionReason    String?
+
+  block    ExerciseBlock   @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  exercise ExerciseLibrary @relation(fields: [exerciseId], references: [id])
+
+  @@index([blockId])
+  @@index([exerciseId])
+}
+
+// ==================== EXERCISE LIBRARY ====================
+
+model ExerciseLibrary {
+  id          String @id @default(cuid())
+  name        String @unique
+  slug        String @unique
+  description String
+
+  // Taxonomy
+  movementPattern  String
+  plane            String
+  primaryMuscles   String // JSON array
+  secondaryMuscles String // JSON array
+
+  // Classification
+  difficulty      String
+  difficultyScore Int
+  equipmentNeeded String // JSON array
+
+  // Safety
+  prerequisites     String // JSON array
+  contraindications String // JSON array
+
+  // Progressions
+  progressionOf String?
+  regressionOf  String?
+
+  // Content
+  formCues       String // JSON array
+  commonMistakes String // JSON array
+  videoUrl       String?
+  imageUrl       String?
+
+  plannedExercises PlannedExercise[]
+  tags             ExerciseTag[]
+  muscles          ExerciseMuscle[]
+
+  @@index([movementPattern])
+  @@index([difficulty])
+  @@index([slug])
+}
+
+model ExerciseTag {
+  id         String @id @default(cuid())
+  exerciseId String
+  tag        String
+
+  exercise ExerciseLibrary @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, tag])
+  @@index([tag])
+}
+
+model ExerciseMuscle {
+  id         String  @id @default(cuid())
+  exerciseId String
+  muscle     String
+  isPrimary  Boolean
+
+  exercise ExerciseLibrary @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, muscle])
+  @@index([muscle, isPrimary])
+}
+
+// ==================== PROGRESS TRACKING ====================
+
+model WorkoutLog {
+  id        String   @id @default(cuid())
+  userId    String
+  dayId     String
+  completedAt DateTime
+  durationMin Int
+  notes       String?
+  
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day          WorkoutDay    @relation(fields: [dayId], references: [id])
+  exerciseLogs ExerciseLog[]
+  
+  @@index([userId, completedAt])
+  @@index([dayId])
+}
+
+model ExerciseLog {
+  id           String @id @default(cuid())
+  workoutLogId String
+  exerciseId   String
+  setsCompleted Int
+  repsData     String // JSON: [{ setNumber, reps, completed }]
+  totalReps    Int
+  
+  workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  
+  @@index([workoutLogId])
+  @@index([exerciseId])
+}
+
+model PersonalRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  exerciseId String
+  recordType String   // "max_reps" | "max_hold" | "first_achievement"
+  value      Float?
+  achievedAt DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, exerciseId, recordType])
+  @@index([userId])
+}
+
+model ProgressLog {
+  id        String   @id @default(cuid())
+  userId    String
+  planId    String?
+  createdAt DateTime @default(now())
+
+  // What was done
+  dayNumber    Int?
+  exerciseId   String?
+  exerciseName String
+
+  // Performance
+  setsCompleted Int
+  repsAchieved  String // JSON array: [12, 10, 8]
+  holdTime      Int?
+  rpe           Int?
+  notes         String?
+
+  // Bodyweight tracking
+  bodyweightKg Float?
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan WorkoutPlan? @relation(fields: [planId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, exerciseId])
+  @@index([planId])
+}
+
+// ==================== SUBSCRIPTIONS ====================
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // PayPal identifiers
+  paypalSubscriptionId String  @unique
+  paypalPlanId         String
+  paypalPayerId        String?
+
+  // Status: PENDING, ACTIVE, CANCELLED, SUSPENDED, EXPIRED
+  status String @default("PENDING")
+  tier   String // BASIC, PREMIUM
+
+  // Periods
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelledAt        DateTime?
+  gracePeriodEnd     DateTime?
+
+  user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events SubscriptionEvent[]
+
+  @@index([userId])
+  @@index([paypalSubscriptionId])
+  @@index([status])
+}
+
+model SubscriptionEvent {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  createdAt      DateTime @default(now())
+
+  // Idempotency
+  paypalEventId   String @unique
+  paypalEventType String
+
+  // Event data
+  eventData String // JSON
+  processed Boolean @default(false)
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([paypalEventId])
+}
+
+// ==================== AI USAGE TRACKING ====================
+
+model AiUsageLog {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  date      String // "2026-01-22" for daily aggregation
+
+  endpoint         String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  estimatedCostUsd Float
+  requestCount     Int    @default(1)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, endpoint])
+  @@index([userId, date])
+  @@map("ai_usage_log")
+}
+
+// ==================== CHAT ====================
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  role    String
+  content String
+
+  // Context
+  contextPlanId    String?
+  contextProfileId String?
+
+  // Metadata
+  tokensUsed  Int?
+  wasFiltered Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ==================== TEMPLATES ====================
+
+model TemplatePlan {
+  id          String @id @default(cuid())
+  name        String
+  description String
+
+  fitnessLevel String
+  goalFocus    String
+  daysPerWeek  Int
+
+  // The template structure (JSON)
+  structure String
+
+  isActive Boolean @default(true)
+
+  @@index([fitnessLevel, goalFocus])
+}
