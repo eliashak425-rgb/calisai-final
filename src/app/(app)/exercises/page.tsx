@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
+// Prevent static generation - requires database at runtime
+export const dynamic = 'force-dynamic';
+
 export default async function ExercisesPage() {
   const exercises = await prisma.exerciseLibrary.findMany({
     include: {

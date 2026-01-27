@@ -4,6 +4,8 @@ import Link from "next/link";
 import { DashboardClient } from "./DashboardClient";
 import { Logo } from "@/components/ui/Logo";
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   const user = await requireAuth();
 

@@ -4,6 +4,8 @@ import { getUserEntitlements } from "@/lib/entitlements";
 import Link from "next/link";
 import { SettingsClient } from "./SettingsClient";
 
+export const dynamic = 'force-dynamic';
+
 export default async function SettingsPage() {
   const user = await requireAuth();
   const entitlements = await getUserEntitlements(user.id);

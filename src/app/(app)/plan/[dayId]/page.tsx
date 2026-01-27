@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: Promise<{ dayId: string }>;
 }
