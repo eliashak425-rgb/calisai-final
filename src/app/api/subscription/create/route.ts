@@ -44,12 +44,17 @@ export async function POST(request: Request) {
       });
     } else {
       // Create new subscription
-      // In production, this would happen after Stripe webhook confirms payment
+      // In production, this would happen after payment webhook confirms payment
+      // For now, using placeholder values for required PayPal fields
+      const subscriptionId = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       await prisma.subscription.create({
         data: {
           userId: session.user.id,
           tier,
           status: "ACTIVE",
+          paypalSubscriptionId: subscriptionId,
+          paypalPlanId: `plan_${planId}`,
           currentPeriodStart: new Date(),
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         },
