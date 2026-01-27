@@ -60,11 +60,15 @@ export async function createTestSubscription(userId: string, tier: SubscriptionT
     return existingSubscription;
   }
 
+  const subscriptionId = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   return await prisma.subscription.create({
     data: {
       userId,
       tier,
       status: "ACTIVE",
+      paypalSubscriptionId: subscriptionId,
+      paypalPlanId: `plan_test_${tier.toLowerCase()}`,
       currentPeriodStart: new Date(),
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     },
