@@ -70,7 +70,23 @@ export async function getTemplatePlan(
  * Hardcoded beginner plan for when no templates exist in DB
  */
 function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
-  const days = [];
+  const days: Array<{
+    dayNumber: number;
+    dayType: "push" | "pull" | "skill" | "legs" | "full" | "rest" | "active_recovery";
+    totalDurationMin: number;
+    blocks: Array<{
+      blockType: string;
+      durationMin: number;
+      exercises: Array<{
+        exerciseSlug: string;
+        exerciseId: string;
+        sets: number;
+        reps: string;
+        restSec: number;
+        intensity: { type: string; value: number };
+      }>;
+    }>;
+  }> = [];
   
   // Create workout days based on daysPerWeek
   for (let i = 1; i <= 30; i++) {
@@ -79,13 +95,14 @@ function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
     if (isRestDay) {
       days.push({
         dayNumber: i,
-        dayType: "rest",
+        dayType: "rest" as const,
         totalDurationMin: 0,
         blocks: [],
       });
     } else {
-      // Rotate between push, pull, and legs focus
-      const focus = ["push", "pull", "full_body"][(i - 1) % 3];
+      // Rotate between push, pull, and full focus
+      const focusOptions = ["push", "pull", "full"] as const;
+      const focus = focusOptions[(i - 1) % 3];
       days.push(createWorkoutDay(i, focus));
     }
   }
@@ -101,7 +118,7 @@ function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
   };
 }
 
-function createWorkoutDay(dayNumber: number, focus: string) {
+function createWorkoutDay(dayNumber: number, focus: "push" | "pull" | "full") {
   const exercises = {
     push: [
       { slug: "push-up", name: "Push-Up" },
@@ -113,7 +130,7 @@ function createWorkoutDay(dayNumber: number, focus: string) {
       { slug: "dead-hang", name: "Dead Hang" },
       { slug: "pull-up", name: "Pull-Up" },
     ],
-    full_body: [
+    full: [
       { slug: "bodyweight-squat", name: "Bodyweight Squat" },
       { slug: "push-up", name: "Push-Up" },
       { slug: "plank", name: "Plank" },
@@ -121,11 +138,11 @@ function createWorkoutDay(dayNumber: number, focus: string) {
     ],
   };
 
-  const focusExercises = exercises[focus as keyof typeof exercises] || exercises.full_body;
+  const focusExercises = exercises[focus];
 
   return {
     dayNumber,
-    dayType: focus,
+    dayType: focus as "push" | "pull" | "full",
     totalDurationMin: 45,
     blocks: [
       {
