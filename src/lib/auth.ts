@@ -85,10 +85,8 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    async redirect({ url, baseUrl }) {
-      // After sign in, go to paywall first
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (new URL(url).origin === baseUrl) return url;
+    async redirect({ baseUrl }) {
+      // ALWAYS go to paywall after sign in
       return `${baseUrl}/paywall`;
     },
   },

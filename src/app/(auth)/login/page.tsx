@@ -29,8 +29,8 @@ function LoginForm() {
     setError("");
     setGoogleLoading(true);
     try {
-      // Use redirect: true (default) for proper OAuth flow
-      await signIn("google", { callbackUrl });
+      // Always redirect to paywall after login
+      await signIn("google", { callbackUrl: "/paywall" });
     } catch (err) {
       console.error("Google sign-in error:", err);
       setError("Failed to start Google sign-in. Please try again.");
