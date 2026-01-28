@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { GeneratedPlanResponse } from "@/types/plan";
+import type { GeneratedPlanResponse, DayStructure, WorkoutBlock, ExerciseBlock } from "@/types/plan";
 
 export async function getTemplatePlan(
   fitnessLevel: string,
@@ -70,23 +70,7 @@ export async function getTemplatePlan(
  * Hardcoded beginner plan for when no templates exist in DB
  */
 function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
-  const days: Array<{
-    dayNumber: number;
-    dayType: "push" | "pull" | "skill" | "legs" | "full" | "rest" | "active_recovery";
-    totalDurationMin: number;
-    blocks: Array<{
-      blockType: string;
-      durationMin: number;
-      exercises: Array<{
-        exerciseSlug: string;
-        exerciseId: string;
-        sets: number;
-        reps: string;
-        restSec: number;
-        intensity: { type: string; value: number };
-      }>;
-    }>;
-  }> = [];
+  const days: DayStructure[] = [];
   
   // Create workout days based on daysPerWeek
   for (let i = 1; i <= 30; i++) {
@@ -95,15 +79,15 @@ function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
     if (isRestDay) {
       days.push({
         dayNumber: i,
-        dayType: "rest" as const,
+        dayType: "rest",
         totalDurationMin: 0,
         blocks: [],
       });
     } else {
       // Rotate between push, pull, and full focus
-      const focusOptions = ["push", "pull", "full"] as const;
-      const focus = focusOptions[(i - 1) % 3];
-      days.push(createWorkoutDay(i, focus));
+      const focusIndex = (i - 1) % 3;
+      const dayType: DayStructure["dayType"] = focusIndex === 0 ? "push" : focusIndex === 1 ? "pull" : "full";
+      days.push(createWorkoutDay(i, dayType));
     }
   }
 
@@ -118,7 +102,23 @@ function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
   };
 }
 
-function createWorkoutDay(dayNumber: number, focus: "push" | "pull" | "full") {
+function createExercise(id: string, name: string, sets: number, reps: string, restSec: number, rpeValue: number): ExerciseBlock {
+  return {
+    exerciseId: id,
+    name,
+    sets,
+    reps,
+    restSec,
+    tempo: null,
+    intensity: { type: "rpe", value: rpeValue },
+    notes: null,
+    progression: { rule: "increase reps" },
+    regression: { exerciseId: id, reason: "form breakdown" },
+    tags: [],
+  };
+}
+
+function createWorkoutDay(dayNumber: number, dayType: DayStructure["dayType"]): DayStructure {
   const exercises = {
     push: [
       { slug: "push-up", name: "Push-Up" },
@@ -138,62 +138,36 @@ function createWorkoutDay(dayNumber: number, focus: "push" | "pull" | "full") {
     ],
   };
 
-  const focusExercises = exercises[focus];
+  const focusExercises = exercises[dayType as "push" | "pull" | "full"] || exercises.full;
+
+  const blocks: WorkoutBlock[] = [
+    {
+      blockType: "warmup",
+      durationMin: 5,
+      exercises: [
+        createExercise("arm-circles", "Arm Circles", 2, "10", 30, 3),
+        createExercise("cat-cow", "Cat-Cow", 2, "10", 30, 3),
+      ],
+    },
+    {
+      blockType: "strength",
+      durationMin: 35,
+      exercises: focusExercises.map((ex) => createExercise(ex.slug, ex.name, 3, "8-12", 60, 7)),
+    },
+    {
+      blockType: "cooldown",
+      durationMin: 5,
+      exercises: [
+        createExercise("plank", "Plank", 2, "30s", 30, 5),
+      ],
+    },
+  ];
 
   return {
     dayNumber,
-    dayType: focus as "push" | "pull" | "full",
+    dayType,
     totalDurationMin: 45,
-    blocks: [
-      {
-        blockType: "warmup",
-        durationMin: 5,
-        exercises: [
-          {
-            exerciseSlug: "arm-circles",
-            exerciseId: "arm-circles",
-            sets: 2,
-            reps: "10",
-            restSec: 30,
-            intensity: { type: "rpe", value: 3 },
-          },
-          {
-            exerciseSlug: "cat-cow",
-            exerciseId: "cat-cow",
-            sets: 2,
-            reps: "10",
-            restSec: 30,
-            intensity: { type: "rpe", value: 3 },
-          },
-        ],
-      },
-      {
-        blockType: "strength",
-        durationMin: 35,
-        exercises: focusExercises.map((ex) => ({
-          exerciseSlug: ex.slug,
-          exerciseId: ex.slug,
-          sets: 3,
-          reps: "8-12",
-          restSec: 60,
-          intensity: { type: "rpe", value: 7 },
-        })),
-      },
-      {
-        blockType: "cooldown",
-        durationMin: 5,
-        exercises: [
-          {
-            exerciseSlug: "plank",
-            exerciseId: "plank",
-            sets: 2,
-            reps: "30s",
-            restSec: 30,
-            intensity: { type: "rpe", value: 5 },
-          },
-        ],
-      },
-    ],
+    blocks,
   };
 }
 
