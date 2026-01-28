@@ -53,7 +53,7 @@ export async function getUserEntitlements(userId: string): Promise<Entitlements>
     }
   }
 
-  const limits = TIER_LIMITS[tier];
+  const limits = TIER_LIMITS[tier] || TIER_LIMITS.FREE;
 
   return {
     tier,

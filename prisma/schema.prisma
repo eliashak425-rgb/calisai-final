@@ -381,10 +381,14 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // PayPal identifiers
-  paypalSubscriptionId String  @unique
-  paypalPlanId         String
+  // PayPal identifiers (for recurring subscriptions)
+  paypalSubscriptionId String?  @unique
+  paypalPlanId         String?
   paypalPayerId        String?
+
+  // PayPal identifiers (for one-time payments)
+  paypalOrderId   String?
+  paypalCaptureId String?
 
   // Status: PENDING, ACTIVE, CANCELLED, SUSPENDED, EXPIRED
   status String @default("PENDING")
@@ -401,6 +405,7 @@ model Subscription {
 
   @@index([userId])
   @@index([paypalSubscriptionId])
+  @@index([paypalOrderId])
   @@index([status])
 }
 

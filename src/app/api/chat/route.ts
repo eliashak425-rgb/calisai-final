@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { checkChatLimit, recordChatUsage } from "@/lib/entitlements";
+import { getActiveSubscription } from "@/lib/session";
 
 const SYSTEM_PROMPT = `You are Aura, an expert AI calisthenics coach. You help users with:
 - Exercise form and technique
@@ -27,6 +28,15 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check for active subscription
+    const subscription = await getActiveSubscription(session.user.id);
+    if (!subscription) {
+      return NextResponse.json(
+        { error: "Subscription required", code: "SUBSCRIPTION_REQUIRED" },
+        { status: 403 }
+      );
     }
 
     // Check rate limit

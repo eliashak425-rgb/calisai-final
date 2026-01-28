@@ -1,33 +1,78 @@
 import type { TrainingProfile } from "@/types/assessment";
 import type { GuestProfileData } from "@/services/openai/planGenerator";
 
-const PROMPT_VERSION = "v1.1";
+const PROMPT_VERSION = "v2.0";
 
 export function getPromptVersion(): string {
   return PROMPT_VERSION;
 }
 
 export function buildPlanSystemPrompt(): string {
-  return `You are an expert calisthenics coach and personal trainer with 15+ years of experience designing bodyweight training programs. You create safe, effective, and progressive workout plans tailored to individual needs.
+  return `You are an elite calisthenics coach with 20+ years of experience designing progressive bodyweight training programs for athletes at all levels. You specialize in creating challenging but achievable plans that produce real results.
 
 Your expertise includes:
 - Calisthenics skill progressions (muscle-ups, handstands, levers, planche)
-- Bodyweight strength training
+- Bodyweight strength training with proper periodization
 - Movement pattern balancing (push/pull ratios)
 - Injury prevention and working around limitations
-- Programming for all levels from complete beginner to advanced
+- Programming for all levels from complete beginner to elite
 
-CRITICAL RULES:
-1. NEVER include exercises that match the user's avoidTags - these are injury restrictions
-2. Match the session duration to what the user specified (±15%)
-3. Match the number of training days to what the user requested
-4. Include warm-up and cooldown in every training day
-5. Use real exercise IDs from the calisthenics exercise library
-6. Provide clear progression and regression paths for each exercise
-7. Balance push and pull volume (ratio should be 0.8-1.2)
-8. For beginners, keep weekly volume under 30 sets
-9. For intermediate, keep weekly volume under 50 sets
-10. For advanced, keep weekly volume under 70 sets
+## CRITICAL DIFFICULTY SCALING RULES
+
+### BEGINNER (0-6 months training)
+- Weekly volume: 20-30 total working sets
+- Exercise selection: Focus on foundational movements and progressions
+- Rest periods: 60-90 seconds between sets
+- RPE range: 6-7 (2-3 reps in reserve)
+- Progression: Add reps before adding sets
+- Example exercises: Wall push-ups, incline push-ups, knee push-ups, dead hangs, Australian pull-ups, bodyweight squats
+- DO NOT include: Pull-ups, dips, pistol squats, or advanced variations
+
+### INTERMEDIATE (6 months - 2 years training)
+- Weekly volume: 35-50 total working sets
+- Exercise selection: Standard and moderate progressions
+- Rest periods: 75-120 seconds between sets
+- RPE range: 7-8 (1-2 reps in reserve)
+- Progression: Add sets, then add weight/difficulty
+- Example exercises: Full push-ups, diamond push-ups, pull-ups, chin-ups, dips, Bulgarian split squats, pike push-ups
+- Should be able to do: 10+ push-ups, 3+ pull-ups, 20+ bodyweight squats
+
+### ADVANCED (2+ years training)
+- Weekly volume: 50-70 total working sets
+- Exercise selection: Advanced progressions and skill work
+- Rest periods: 90-180 seconds between sets (skill work may need longer)
+- RPE range: 8-9 (0-1 reps in reserve)
+- Progression: Increase difficulty, add weighted variations, extend holds
+- Example exercises: Archer push-ups, muscle-ups, handstand push-ups, front lever progressions, pistol squats, ring dips
+- Should be able to do: 20+ push-ups, 10+ pull-ups, 10+ dips, 60+ second plank
+
+## MINIMUM INTENSITY REQUIREMENTS
+
+DO NOT create "easy" workouts. Every workout should be challenging and effective:
+
+1. BEGINNER workouts should leave users moderately fatigued but not destroyed
+2. INTERMEDIATE workouts should be genuinely challenging, pushing limits
+3. ADVANCED workouts should be demanding, requiring full focus and effort
+
+If a user specifies baseline performance, use those EXACT numbers to calibrate difficulty:
+- If they can do 5 push-ups, start them at 4-5 reps per set (not 10)
+- If they can do 0 pull-ups, use progressions (not full pull-ups)
+- If they can hold a 30s plank, program 25-30s holds (not 60s)
+
+## MUST INCLUDE IN EVERY PLAN
+1. Proper warm-up (5-8 minutes): Dynamic stretches, mobility work, activation
+2. Main workout: 3-5 exercises per session with proper rest
+3. Cool-down (5-7 minutes): Static stretches, breathing
+4. Progressive overload: Clear rules for when to advance
+5. Regression options: For exercises that may be too hard
+
+## AVOID THESE COMMON MISTAKES
+- Programming pull-ups for true beginners (use progressions)
+- Programming muscle-ups for intermediate athletes
+- Too many exercises per session (quality over quantity)
+- Inadequate rest between sets for strength work
+- Same difficulty regardless of fitness level
+- Generic exercises that don't match user's goals
 
 You must respond with ONLY valid JSON matching the required schema. No explanations or additional text.`;
 }
@@ -60,10 +105,22 @@ export function buildPlanUserPrompt(profile: TrainingProfile | any): string {
   const goalSecondary = p.goalSecondary || p.goals?.rankedGoals?.[1];
   const goalTertiary = p.goalTertiary || p.goals?.rankedGoals?.[2];
 
-  return `Create a personalized ${daysPerWeek}-day per week calisthenics workout plan for the following user:
+  // Extract baseline performance
+  const maxPushups = p.maxPushups || p.baseline?.maxPushups;
+  const maxPullups = p.maxPullups || p.baseline?.maxPullups;
+  const maxDips = p.maxDips || p.baseline?.maxDips;
+  const plankHoldSec = p.plankHoldSec || p.baseline?.plankHoldSec;
+  const hollowHoldSec = p.hollowHoldSec || p.baseline?.hollowHoldSec;
+  const wallHandstandHoldSec = p.wallHandstandHoldSec || p.baseline?.wallHandstandHoldSec;
+
+  // Determine specific exercise recommendations based on baseline
+  const pushupRecommendation = getPushupRecommendation(maxPushups);
+  const pullupRecommendation = getPullupRecommendation(maxPullups);
+
+  return `Create a CHALLENGING and EFFECTIVE ${daysPerWeek}-day per week calisthenics workout plan for this user:
 
 ## User Profile
-- Fitness Level: ${fitnessLevel}
+- Fitness Level: ${fitnessLevel.toUpperCase()}
 - Age: ${age} years old
 - Training Experience: ${trainingAge}
 - Session Duration: ${sessionDurationMin} minutes per session
@@ -72,33 +129,57 @@ export function buildPlanUserPrompt(profile: TrainingProfile | any): string {
 ## Available Equipment
 ${equipmentList}
 
-## Goals
-- Primary: ${goalPrimary.replace(/_/g, " ")}
+## Goals (PRIORITIZE THESE)
+- PRIMARY GOAL: ${goalPrimary.replace(/_/g, " ").toUpperCase()}
 ${goalSecondary ? `- Secondary: ${goalSecondary.replace(/_/g, " ")}` : ""}
 ${goalTertiary ? `- Tertiary: ${goalTertiary.replace(/_/g, " ")}` : ""}
 
-## Baseline Performance
-- Push-ups: ${p.maxPushups || p.baseline?.maxPushups || "N/A"}
-- Pull-ups: ${p.maxPullups || p.baseline?.maxPullups || "N/A"}
-- Dips: ${p.maxDips || p.baseline?.maxDips || "N/A"}
-- Plank Hold: ${p.plankHoldSec || p.baseline?.plankHoldSec || "N/A"} seconds
-- Hollow Hold: ${p.hollowHoldSec || p.baseline?.hollowHoldSec || "N/A"}
-- Wall Handstand: ${p.wallHandstandHoldSec || p.baseline?.wallHandstandHoldSec || "N/A"}
+## CRITICAL - Baseline Performance (USE THESE TO CALIBRATE DIFFICULTY)
+${maxPushups !== undefined ? `- Max Push-ups: ${maxPushups} → ${pushupRecommendation}` : "- Push-ups: Not tested"}
+${maxPullups !== undefined ? `- Max Pull-ups: ${maxPullups} → ${pullupRecommendation}` : "- Pull-ups: Not tested"}
+${maxDips !== undefined ? `- Max Dips: ${maxDips}` : ""}
+${plankHoldSec !== undefined ? `- Plank Hold: ${plankHoldSec} seconds` : ""}
+${hollowHoldSec !== undefined ? `- Hollow Hold: ${hollowHoldSec} seconds` : ""}
+${wallHandstandHoldSec !== undefined ? `- Wall Handstand: ${wallHandstandHoldSec} seconds` : ""}
 
-## IMPORTANT - Injury Restrictions
+## INJURY RESTRICTIONS (ABSOLUTE - DO NOT VIOLATE)
 ${avoidTags.length > 0 
-  ? `DO NOT include exercises with these tags: ${avoidTags.join(", ")}`
-  : "No injury restrictions"}
+  ? `AVOID exercises with these tags: ${avoidTags.join(", ")}`
+  : "No restrictions"}
 
-Generate a complete weekly workout plan with:
-1. ${daysPerWeek} training days spread across the week
-2. Each session approximately ${sessionDurationMin} minutes
-3. Warm-up block (5-8 min) and cooldown block (5 min) for each day
-4. Appropriate exercises for ${fitnessLevel} level
-5. Clear progression rules for each exercise
-6. Regressions for exercises that might be too challenging
+## Requirements for this plan:
 
-Focus on the user's primary goal of "${goalPrimary.replace(/_/g, " ")}" while maintaining balanced training.`;
+1. Create ${daysPerWeek} training days with smart muscle group splits
+2. Each session ~${sessionDurationMin} minutes total
+3. ALWAYS include: Warmup (5-8 min) → Main Work → Cooldown (5-7 min)
+4. Match exercise difficulty to ${fitnessLevel} level EXACTLY
+5. Use baseline numbers to set appropriate rep ranges
+6. Include REST PERIODS between sets (not just exercise duration)
+7. Provide progression rules (when to make exercise harder)
+8. Provide regressions (easier version if too hard)
+9. RPE/RIR guidance for each exercise
+10. Focus heavily on "${goalPrimary.replace(/_/g, " ")}"
+
+THIS PLAN MUST BE CHALLENGING. Do not create an easy workout. The user should feel like they worked hard after each session.`;
+}
+
+function getPushupRecommendation(maxPushups: number | undefined): string {
+  if (maxPushups === undefined) return "Use wall/incline progressions to assess";
+  if (maxPushups === 0) return "Start with wall push-ups, progress to incline";
+  if (maxPushups <= 5) return "Use knee push-ups or incline, 4-5 reps per set";
+  if (maxPushups <= 10) return "Standard push-ups, 6-8 reps per set";
+  if (maxPushups <= 20) return "Push-ups + diamond variations, 8-12 reps";
+  if (maxPushups <= 30) return "Advanced variations (archer, clap), 10-15 reps";
+  return "Elite variations (one-arm progressions, planche), high reps";
+}
+
+function getPullupRecommendation(maxPullups: number | undefined): string {
+  if (maxPullups === undefined) return "Start with dead hangs and negatives";
+  if (maxPullups === 0) return "Dead hangs, scapular pulls, band-assisted or negatives only";
+  if (maxPullups <= 3) return "Negatives + assisted pull-ups, work up to 3 per set";
+  if (maxPullups <= 8) return "Standard pull-ups 4-6 reps, chin-ups for volume";
+  if (maxPullups <= 15) return "Weighted pull-ups, L-sit pull-ups, 6-10 reps";
+  return "Advanced (muscle-up progressions, one-arm negatives)";
 }
 
 /**
@@ -117,52 +198,67 @@ export function buildGuestPlanPrompt(profile: GuestProfileData): string {
 
   // Recovery-based adjustments
   const intensityMod = profile.goals.intensityPreference === "chill" 
-    ? "Keep intensity moderate with longer rest periods."
+    ? "User prefers moderate intensity - use RPE 6-7, longer rest (90-120s)"
     : profile.goals.intensityPreference === "intense"
-    ? "Can push intensity higher with shorter rest periods."
-    : "";
+    ? "User wants HIGH intensity - use RPE 8-9, shorter rest (45-60s), supersets OK"
+    : "Balance intensity with proper rest periods";
 
   const recoveryNote = profile.recoveryPrefs
-    ? `Sleep Quality: ${profile.recoveryPrefs.sleepQuality}, Soreness Tolerance: ${profile.recoveryPrefs.sorenessTolerance}`
+    ? `Sleep: ${profile.recoveryPrefs.sleepQuality}, Soreness tolerance: ${profile.recoveryPrefs.sorenessTolerance}`
     : "";
 
-  return `Create a personalized ${profile.availability.daysPerWeek}-day per week calisthenics workout plan for the following user:
+  // Fitness score interpretation
+  const fitnessInterpretation = profile.fitnessScore < 30 
+    ? "TRUE BEGINNER - focus on fundamentals, form over intensity"
+    : profile.fitnessScore < 50
+    ? "BEGINNER - can handle basic compound movements"
+    : profile.fitnessScore < 70
+    ? "INTERMEDIATE - ready for challenging progressions"
+    : "ADVANCED - can handle complex movements and high volume";
 
-## User Profile
-- Fitness Level: ${profile.fitnessLevel} (score: ${profile.fitnessScore}/100)
-- Age: ${profile.basicInfo.age} years old
+  return `Create a CHALLENGING ${profile.availability.daysPerWeek}-day per week calisthenics workout plan:
+
+## User Assessment Results
+- Fitness Level: ${profile.fitnessLevel.toUpperCase()} (Score: ${profile.fitnessScore}/100)
+- Assessment: ${fitnessInterpretation}
+- Age: ${profile.basicInfo.age} years
 - Training Experience: ${profile.trainingBackground.trainingAge}
-- Session Duration: ${profile.availability.sessionDurationMin} minutes per session
+- Session Duration: ${profile.availability.sessionDurationMin} minutes
 - Preferred Time: ${profile.availability.preferredTime}
-- Training Location: ${profile.location.trainingLocation}
-${recoveryNote ? `- Recovery: ${recoveryNote}` : ""}
+- Location: ${profile.location.trainingLocation}
+${recoveryNote ? `- Recovery Profile: ${recoveryNote}` : ""}
 
-## Available Equipment
+## Equipment Available
 ${equipmentList}
 
-## Goals (in priority order)
-1. Primary: ${primaryGoal}
+## Goals (IN PRIORITY ORDER - EMPHASIZE PRIMARY)
+1. PRIMARY: ${primaryGoal.toUpperCase()}
 ${secondaryGoal ? `2. Secondary: ${secondaryGoal}` : ""}
 ${tertiaryGoal ? `3. Tertiary: ${tertiaryGoal}` : ""}
 
-## Training Preferences
-- Intensity: ${profile.goals.intensityPreference}
+## Intensity Preference
 ${intensityMod}
 
-## IMPORTANT - Injury Restrictions
+## INJURY RESTRICTIONS (DO NOT VIOLATE)
 ${profile.avoidTags.length > 0 
-  ? `DO NOT include exercises with these tags: ${profile.avoidTags.join(", ")}`
-  : "No injury restrictions"}
+  ? `ABSOLUTELY AVOID: ${profile.avoidTags.join(", ")}`
+  : "No restrictions"}
 
-Generate a complete weekly workout plan with:
-1. ${profile.availability.daysPerWeek} training days spread optimally across the week
-2. Each session approximately ${profile.availability.sessionDurationMin} minutes
-3. Warm-up block (5-8 min) and cooldown block (5 min) for each training day
-4. Appropriate exercises for ${profile.fitnessLevel} level
-5. Clear progression rules for each exercise
-6. Regressions for exercises that might be too challenging
-7. RIR (Reps In Reserve) or RPE intensity guidance for each exercise
+## Plan Requirements
 
-Focus on the user's primary goal of "${primaryGoal}" while maintaining balanced push/pull training.`;
+1. ${profile.availability.daysPerWeek} training days with smart splits
+2. ~${profile.availability.sessionDurationMin} minute sessions
+3. Structure: Warmup (5-8 min) → Main Work → Cooldown (5-7 min)
+4. Exercise difficulty MUST match ${profile.fitnessLevel} level
+5. Include specific REST PERIODS (45-120s based on intensity)
+6. Clear progression rules for EVERY exercise
+7. Regression options for challenging movements
+8. RPE/RIR for each exercise
+
+REMEMBER: Fitness score ${profile.fitnessScore}/100 = ${profile.fitnessLevel}
+- Don't give pull-ups to someone who can't do one
+- Don't give wall push-ups to someone who can do 20 regular ones
+- The plan should be CHALLENGING for THIS specific user's level
+
+Primary focus: ${primaryGoal.toUpperCase()}`;
 }
-

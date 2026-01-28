@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/session";
+import { requireSubscription } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -29,9 +29,9 @@ interface WorkoutDay {
 }
 
 export default async function PlanPage() {
-  const user = await requireAuth();
+  const { user } = await requireSubscription();
 
-  // Note: Subscription check removed for now - allowing free users to access their plans
+  // Subscription check is now enforced by requireSubscription
   
   const plan = await prisma.workoutPlan.findFirst({
     where: { userId: user.id, isActive: true },
@@ -61,13 +61,23 @@ export default async function PlanPage() {
     },
   });
 
-  // Get completed workouts
+  // Get completed workouts with timestamps
   const completedWorkouts = await prisma.workoutLog.findMany({
     where: { userId: user.id },
     select: { dayId: true, completedAt: true },
+    orderBy: { completedAt: "desc" },
   });
 
   const completedDayIds = new Set(completedWorkouts.map(w => w.dayId));
+  const completionTimes = new Map(completedWorkouts.map(w => [w.dayId, w.completedAt]));
+  
+  // Check cooldown - 20 hours between workouts
+  const COOLDOWN_HOURS = 20;
+  const lastWorkout = completedWorkouts[0];
+  const cooldownEndsAt = lastWorkout 
+    ? new Date(lastWorkout.completedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000)
+    : null;
+  const isOnCooldown = cooldownEndsAt && cooldownEndsAt > new Date();
 
   if (!plan) {
     // No plan exists - redirect to plan generation
@@ -158,7 +168,7 @@ export default async function PlanPage() {
         </section>
 
         {/* Today's Workout Card */}
-        {nextDay && (
+        {nextDay && !isOnCooldown && (
           <TodayWorkoutCard 
             day={nextDay as WorkoutDay} 
             dayNumber={currentDayNumber}
@@ -243,13 +253,42 @@ export default async function PlanPage() {
           </div>
         </section>
 
+        {/* Cooldown Notice */}
+        {isOnCooldown && cooldownEndsAt && (
+          <section className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/30 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-amber-400">Recovery Time</h3>
+                <p className="text-sm text-amber-400/70">
+                  Next workout unlocks at {cooldownEndsAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* All Days List */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider">All Training Days</h2>
           <div className="space-y-2">
             {plan.days.map((day, index) => {
               const isCompleted = completedDayIds.has(day.id);
-              const isLocked = index > 0 && !completedDayIds.has(plan.days[index - 1].id) && !isCompleted;
+              const previousDayId = index > 0 ? plan.days[index - 1].id : null;
+              const previousDayCompleted = previousDayId ? completedDayIds.has(previousDayId) : true;
+              
+              // Day is locked if:
+              // 1. Previous day is not completed (and this day is not completed)
+              // 2. OR we're on cooldown (even if previous day is done)
+              const isLockedByProgress = !previousDayCompleted && !isCompleted;
+              const isLockedByCooldown = !isCompleted && previousDayCompleted && !!isOnCooldown;
+              const isLocked = isLockedByProgress || isLockedByCooldown;
+              
               const isRest = day.dayType === "rest";
               const exerciseCount = day.blocks.reduce((acc, b) => acc + b.exercises.length, 0);
               
@@ -262,6 +301,7 @@ export default async function PlanPage() {
                   isLocked={isLocked}
                   isRest={isRest}
                   exerciseCount={exerciseCount}
+                  cooldownEndsAt={isLockedByCooldown ? cooldownEndsAt : undefined}
                 />
               );
             })}
@@ -338,20 +378,21 @@ function TodayWorkoutCard({ day, dayNumber, totalDays, completedDays }: {
   );
 }
 
-function DayCard({ day, dayIndex, isCompleted, isLocked, isRest, exerciseCount }: {
+function DayCard({ day, dayIndex, isCompleted, isLocked, isRest, exerciseCount, cooldownEndsAt }: {
   day: WorkoutDay;
   dayIndex: number;
   isCompleted: boolean;
   isLocked: boolean;
   isRest: boolean;
   exerciseCount: number;
+  cooldownEndsAt?: Date;
 }) {
   const content = (
     <div className={`rounded-xl p-4 transition-all ${
       isCompleted
         ? "bg-emerald-500/10 ring-1 ring-emerald-500/30"
         : isLocked
-        ? "bg-neutral-900/50 ring-1 ring-neutral-800 opacity-50"
+        ? "bg-neutral-900/50 ring-1 ring-neutral-800 opacity-60"
         : isRest
         ? "bg-neutral-900/50 ring-1 ring-neutral-800"
         : "bg-neutral-900 ring-1 ring-neutral-800 hover:ring-neutral-700"
@@ -361,6 +402,8 @@ function DayCard({ day, dayIndex, isCompleted, isLocked, isRest, exerciseCount }
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
             isCompleted
               ? "bg-emerald-500 text-white"
+              : isLocked && cooldownEndsAt
+              ? "bg-amber-500/20 text-amber-400"
               : isLocked
               ? "bg-neutral-800 text-neutral-600"
               : isRest
@@ -370,6 +413,11 @@ function DayCard({ day, dayIndex, isCompleted, isLocked, isRest, exerciseCount }
             {isCompleted ? (
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : isLocked && cooldownEndsAt ? (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
               </svg>
             ) : isLocked ? (
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -383,11 +431,21 @@ function DayCard({ day, dayIndex, isCompleted, isLocked, isRest, exerciseCount }
             )}
           </div>
           <div>
-            <h3 className={`font-medium ${isCompleted ? "text-emerald-400" : isLocked ? "text-neutral-500" : "text-white"}`}>
+            <h3 className={`font-medium ${
+              isCompleted ? "text-emerald-400" 
+              : isLocked && cooldownEndsAt ? "text-amber-400"
+              : isLocked ? "text-neutral-500" 
+              : "text-white"
+            }`}>
               Day {dayIndex + 1} {isRest ? "• Rest" : `• ${day.dayType.replace("_", " ")}`}
             </h3>
             <p className="text-xs text-neutral-500">
-              {isRest ? "Recovery day" : `${exerciseCount} exercises • ${day.totalDurationMin} min`}
+              {isRest 
+                ? "Recovery day" 
+                : cooldownEndsAt 
+                ? `Unlocks at ${cooldownEndsAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : `${exerciseCount} exercises • ${day.totalDurationMin} min`
+              }
             </p>
           </div>
         </div>

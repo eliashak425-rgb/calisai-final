@@ -1,6 +1,6 @@
-import { requireAuth } from "@/lib/session";
+import { requireSubscription } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic';
@@ -10,21 +10,8 @@ interface PageProps {
 }
 
 export default async function DayPreviewPage({ params }: PageProps) {
-  const user = await requireAuth();
+  const { user } = await requireSubscription();
   const { dayId } = await params;
-
-  // Check subscription
-  const subscription = await prisma.subscription.findFirst({
-    where: {
-      userId: user.id,
-      status: "ACTIVE",
-      currentPeriodEnd: { gt: new Date() },
-    },
-  });
-
-  if (!subscription) {
-    redirect("/subscribe");
-  }
 
   // Get the workout day
   const workoutDay = await prisma.workoutDay.findFirst({

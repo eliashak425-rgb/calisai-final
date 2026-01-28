@@ -4,12 +4,22 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateWorkoutPlan } from "@/services/openai/planGenerator";
 import type { TrainingProfile } from "@/types/assessment";
+import { getActiveSubscription } from "@/lib/session";
 
 export async function POST() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check for active subscription
+    const subscription = await getActiveSubscription(session.user.id);
+    if (!subscription) {
+      return NextResponse.json(
+        { error: "Subscription required", code: "SUBSCRIPTION_REQUIRED" },
+        { status: 403 }
+      );
     }
 
     // Get the user's active training profile

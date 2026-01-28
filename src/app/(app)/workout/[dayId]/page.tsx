@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -59,6 +59,7 @@ export default function WorkoutPage() {
   const params = useParams();
   const router = useRouter();
   const dayId = params.dayId as string;
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [workoutDay, setWorkoutDay] = useState<WorkoutDay | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,8 @@ export default function WorkoutPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [saving, setSaving] = useState(false);
   const [startTime] = useState<Date>(new Date());
+  const [customReps, setCustomReps] = useState<number>(10);
+  const [activeSetIndex, setActiveSetIndex] = useState<number | null>(null);
 
   // Flatten exercises for navigation
   const allExercises = workoutDay?.blocks.flatMap((block) =>
@@ -77,6 +80,10 @@ export default function WorkoutPage() {
 
   const currentExercise = allExercises[currentExerciseIndex];
   const currentLog = currentExercise ? logs[currentExercise.id] : null;
+
+  // Check if all sets are completed for current exercise
+  const allSetsCompleted = currentLog?.sets.every((s) => s.completed) ?? false;
+  const completedSets = currentLog?.sets.filter((s) => s.completed).length || 0;
 
   useEffect(() => {
     const fetchWorkout = async () => {
@@ -101,6 +108,9 @@ export default function WorkoutPage() {
             });
           });
           setLogs(initialLogs);
+        } else if (response.status === 403) {
+          // Subscription required
+          router.push("/paywall");
         }
       } catch (error) {
         console.error("Failed to fetch workout", error);
@@ -110,15 +120,28 @@ export default function WorkoutPage() {
     };
 
     fetchWorkout();
-  }, [dayId]);
+  }, [dayId, router]);
 
-  // Rest timer countdown
+  // Initialize custom reps when exercise changes
+  useEffect(() => {
+    if (currentExercise) {
+      const baseReps = parseInt(currentExercise.reps) || 10;
+      setCustomReps(baseReps);
+      setActiveSetIndex(null);
+    }
+  }, [currentExercise]);
+
+  // Rest timer countdown with audio
   useEffect(() => {
     if (timerState === "running" && restTimer > 0) {
       const timer = setTimeout(() => setRestTimer(restTimer - 1), 1000);
       return () => clearTimeout(timer);
     } else if (restTimer === 0 && timerState === "running") {
       setTimerState("idle");
+      // Play sound when timer ends
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
     }
   }, [restTimer, timerState]);
 
@@ -147,14 +170,18 @@ export default function WorkoutPage() {
       },
     }));
 
-    // Start rest timer after logging (only if not the last set)
-    const completedSets = logs[currentExercise.id]?.sets.filter(s => s.completed).length || 0;
-    if (completedSets < currentExercise.sets - 1) {
+    setActiveSetIndex(null);
+
+    // Auto-start rest timer after logging (only if not the last set)
+    const newCompletedSets = completedSets + 1;
+    if (newCompletedSets < currentExercise.sets) {
       startRest(currentExercise.restSec);
     }
   };
 
   const nextExercise = () => {
+    if (!allSetsCompleted) return; // Enforce completion
+
     if (currentExerciseIndex < allExercises.length - 1) {
       setCurrentExerciseIndex(currentExerciseIndex + 1);
       setTimerState("idle");
@@ -294,13 +321,18 @@ export default function WorkoutPage() {
   }
 
   const intensity = currentExercise ? JSON.parse(currentExercise.intensity) : null;
-  const completedSets = currentLog?.sets.filter((s) => s.completed).length || 0;
   const progress = Math.round(
     ((currentExerciseIndex + completedSets / (currentExercise?.sets || 1)) / allExercises.length) * 100
   );
+  const targetReps = parseInt(currentExercise?.reps || "10") || 10;
 
   return (
     <div className="min-h-screen bg-neutral-950 pb-32">
+      {/* Audio for timer end */}
+      <audio ref={audioRef} preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2EhX19e3p7fH1+f4CCgoOEhYaHiImJiomJiIeGhYSDgX9+fXx7enp6enp7fH1+f4GCg4SFhoaHiImJiYmIh4aFhIOCgH9+fXx7enp5eXl5eXp7fH1+f4GCg4SFhoaHh4iIiIiHhoWEg4KBf35" type="audio/wav"/>
+      </audio>
+
       {/* Top Progress Bar */}
       <div className="fixed top-0 left-0 right-0 z-30 bg-neutral-950/90 backdrop-blur-lg border-b border-neutral-800">
         <div className="h-1 bg-neutral-800">
@@ -344,7 +376,7 @@ export default function WorkoutPage() {
               <div className="text-8xl font-bold text-white mb-2">
                 {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, "0")}
               </div>
-              <p className="text-neutral-400">Rest Time</p>
+              <p className="text-neutral-400">Rest Time - Next set coming up!</p>
             </div>
 
             {/* Timer circle visualization */}
@@ -405,7 +437,7 @@ export default function WorkoutPage() {
                 onClick={skipRest}
                 className="flex-1 py-4 bg-neutral-800 text-neutral-300 rounded-xl font-medium hover:bg-neutral-700 transition-colors"
               >
-                Skip
+                Skip Rest
               </button>
             </div>
           </div>
@@ -423,6 +455,12 @@ export default function WorkoutPage() {
               <span className="text-lg">{currentExercise?.sets} × {currentExercise?.reps}</span>
               <span className="w-1 h-1 rounded-full bg-neutral-600" />
               <span>{intensity?.type.toUpperCase()} {intensity?.value}</span>
+            </div>
+            {/* Completion status */}
+            <div className="mt-3 text-sm">
+              <span className={completedSets === currentExercise?.sets ? "text-emerald-400" : "text-neutral-500"}>
+                {completedSets} / {currentExercise?.sets} sets completed
+              </span>
             </div>
           </div>
 
@@ -454,6 +492,8 @@ export default function WorkoutPage() {
                 className={`rounded-2xl p-4 transition-all ${
                   set.completed
                     ? "bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                    : activeSetIndex === idx
+                    ? "bg-neutral-800 ring-2 ring-emerald-500"
                     : "bg-neutral-900 ring-1 ring-neutral-800"
                 }`}
               >
@@ -480,27 +520,56 @@ export default function WorkoutPage() {
                     </div>
                   </div>
 
-                  {!set.completed && (
-                    <div className="flex gap-2">
-                      {/* Quick rep buttons */}
-                      {[...Array(5)].map((_, i) => {
-                        const baseReps = parseInt(currentExercise?.reps || "10") || 10;
-                        const repValue = Math.max(1, baseReps - 2 + i);
-                        return (
-                          <button
-                            key={i}
-                            onClick={() => logSet(idx, repValue)}
-                            className="w-11 h-11 rounded-xl bg-neutral-800 hover:bg-emerald-500 text-white font-semibold transition-colors"
-                          >
-                            {repValue}
-                          </button>
-                        );
-                      })}
+                  {!set.completed && activeSetIndex !== idx && (
+                    <button
+                      onClick={() => {
+                        setActiveSetIndex(idx);
+                        setCustomReps(targetReps);
+                      }}
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors"
+                    >
+                      Log Set
+                    </button>
+                  )}
+
+                  {!set.completed && activeSetIndex === idx && (
+                    <div className="flex items-center gap-3">
+                      {/* Rep selector with +/- buttons */}
+                      <div className="flex items-center bg-neutral-800 rounded-xl overflow-hidden">
+                        <button
+                          onClick={() => setCustomReps(Math.max(1, customReps - 1))}
+                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-neutral-700 transition-colors"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M5 12h14" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                        <input
+                          type="number"
+                          value={customReps}
+                          onChange={(e) => setCustomReps(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-14 h-10 bg-transparent text-center text-white text-xl font-bold focus:outline-none"
+                        />
+                        <button
+                          onClick={() => setCustomReps(customReps + 1)}
+                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-neutral-700 transition-colors"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => logSet(idx, customReps)}
+                        className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-400 transition-colors"
+                      >
+                        Done
+                      </button>
                     </div>
                   )}
 
                   {set.completed && (
-                    <div className="text-emerald-400 font-semibold">
+                    <div className="text-emerald-400 font-semibold text-lg">
                       {set.reps} reps
                     </div>
                   )}
@@ -533,9 +602,26 @@ export default function WorkoutPage() {
           </button>
           <button
             onClick={nextExercise}
-            className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-lg shadow-emerald-500/25"
+            disabled={!allSetsCompleted}
+            className={`flex-1 py-4 rounded-xl font-semibold transition-all shadow-lg ${
+              allSetsCompleted
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/25"
+                : "bg-neutral-800 text-neutral-500 cursor-not-allowed shadow-none"
+            }`}
           >
-            {currentExerciseIndex === allExercises.length - 1 ? "Finish Workout" : "Next Exercise →"}
+            {!allSetsCompleted ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                Complete all sets
+              </span>
+            ) : currentExerciseIndex === allExercises.length - 1 ? (
+              "Finish Workout"
+            ) : (
+              "Next Exercise →"
+            )}
           </button>
         </div>
       </div>
