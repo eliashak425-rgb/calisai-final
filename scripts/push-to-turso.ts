@@ -24,7 +24,7 @@ async function main() {
   }
   
   // Connect to Turso
-  const client = createClient({ url: DATABASE_URL });
+  const client = createClient({ url: DATABASE_URL! });
   
   // Split by semicolon, handling multi-line statements properly
   const statements: string[] = [];
