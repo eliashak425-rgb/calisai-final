@@ -12,7 +12,7 @@ if (!DATABASE_URL || !DATABASE_URL.startsWith("libsql://")) {
 
 async function main() {
   console.log("🚀 Pushing schema to Turso...");
-  console.log("URL:", DATABASE_URL.split("?")[0]);
+  console.log("URL:", DATABASE_URL!.split("?")[0]);
   
   // Read the SQL file and remove BOM if present
   const sqlPath = path.join(__dirname, "../prisma/schema.sql");

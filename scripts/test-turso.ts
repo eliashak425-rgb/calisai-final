@@ -9,11 +9,11 @@ if (!DATABASE_URL) {
 
 async function main() {
   console.log("🔌 Testing Turso connection...");
-  console.log("URL:", DATABASE_URL.split("?")[0]);
+  console.log("URL:", DATABASE_URL!.split("?")[0]);
   
   // Use intMode: "number" and disable migrations
   const client = createClient({ 
-    url: DATABASE_URL,
+    url: DATABASE_URL!,
     intMode: "number",
   });
   
