@@ -1,6 +1,23 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client";
 
-const prisma = new PrismaClient();
+function createPrismaClient() {
+  const databaseUrl = process.env.DATABASE_URL || "";
+  const isLibSQL = databaseUrl.startsWith("libsql://");
+
+  if (isLibSQL) {
+    // For Turso/libSQL
+    const libsql = createClient({ url: databaseUrl });
+    const adapter = new PrismaLibSQL(libsql);
+    return new PrismaClient({ adapter });
+  }
+
+  // For local SQLite
+  return new PrismaClient();
+}
+
+const prisma = createPrismaClient();
 
 interface ExerciseData {
   name: string;

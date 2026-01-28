@@ -1,18 +1,23 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  // Check if we're using a libsql URL (Turso)
   const databaseUrl = process.env.DATABASE_URL || "";
   const isLibSQL = databaseUrl.startsWith("libsql://");
 
   if (isLibSQL) {
-    // For Turso/libSQL in production
-    // The adapter is automatically used when DATABASE_URL starts with libsql://
+    // For Turso/libSQL - use the driver adapter
+    const libsql = createClient({
+      url: databaseUrl,
+    });
+    const adapter = new PrismaLibSQL(libsql);
     return new PrismaClient({
+      adapter,
       log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
     });
   }
