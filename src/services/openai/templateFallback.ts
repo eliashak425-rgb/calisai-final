@@ -6,7 +6,7 @@ export async function getTemplatePlan(
   goalPrimary: string,
   daysPerWeek: number
 ): Promise<{ id: string; structure: GeneratedPlanResponse } | null> {
-  // Try to find an exact match
+  // Try to find an exact match from DB
   let template = await prisma.templatePlan.findFirst({
     where: {
       fitnessLevel,
@@ -37,7 +37,7 @@ export async function getTemplatePlan(
     });
   }
 
-  // Last resort: get the most general beginner template
+  // Last resort: get any beginner template
   if (!template) {
     template = await prisma.templatePlan.findFirst({
       where: {
@@ -47,8 +47,13 @@ export async function getTemplatePlan(
     });
   }
 
+  // If no templates in DB, use hardcoded beginner template
   if (!template) {
-    return null;
+    console.log("No templates in DB, using hardcoded beginner template");
+    return {
+      id: "hardcoded-beginner-3day",
+      structure: getHardcodedBeginnerPlan(daysPerWeek),
+    };
   }
 
   const structure = typeof template.structure === "string"
@@ -58,6 +63,120 @@ export async function getTemplatePlan(
   return {
     id: template.id,
     structure: structure as GeneratedPlanResponse,
+  };
+}
+
+/**
+ * Hardcoded beginner plan for when no templates exist in DB
+ */
+function getHardcodedBeginnerPlan(daysPerWeek: number): GeneratedPlanResponse {
+  const days = [];
+  
+  // Create workout days based on daysPerWeek
+  for (let i = 1; i <= 30; i++) {
+    const isRestDay = i % Math.ceil(7 / Math.min(daysPerWeek, 6)) === 0;
+    
+    if (isRestDay) {
+      days.push({
+        dayNumber: i,
+        dayType: "rest",
+        totalDurationMin: 0,
+        blocks: [],
+      });
+    } else {
+      // Rotate between push, pull, and legs focus
+      const focus = ["push", "pull", "full_body"][(i - 1) % 3];
+      days.push(createWorkoutDay(i, focus));
+    }
+  }
+
+  return {
+    weeklyStructure: days,
+    metadata: {
+      totalWeeklyVolume: 45,
+      pushPullRatio: 1.0,
+      skillFocus: ["push-up", "pull-up", "squat"],
+      avoidedMovements: [],
+    },
+  };
+}
+
+function createWorkoutDay(dayNumber: number, focus: string) {
+  const exercises = {
+    push: [
+      { slug: "push-up", name: "Push-Up" },
+      { slug: "pike-push-up", name: "Pike Push-Up" },
+      { slug: "diamond-push-up", name: "Diamond Push-Up" },
+    ],
+    pull: [
+      { slug: "australian-pull-up", name: "Australian Pull-Up" },
+      { slug: "dead-hang", name: "Dead Hang" },
+      { slug: "pull-up", name: "Pull-Up" },
+    ],
+    full_body: [
+      { slug: "bodyweight-squat", name: "Bodyweight Squat" },
+      { slug: "push-up", name: "Push-Up" },
+      { slug: "plank", name: "Plank" },
+      { slug: "glute-bridge", name: "Glute Bridge" },
+    ],
+  };
+
+  const focusExercises = exercises[focus as keyof typeof exercises] || exercises.full_body;
+
+  return {
+    dayNumber,
+    dayType: focus,
+    totalDurationMin: 45,
+    blocks: [
+      {
+        blockType: "warmup",
+        durationMin: 5,
+        exercises: [
+          {
+            exerciseSlug: "arm-circles",
+            exerciseId: "arm-circles",
+            sets: 2,
+            reps: "10",
+            restSec: 30,
+            intensity: { type: "rpe", value: 3 },
+          },
+          {
+            exerciseSlug: "cat-cow",
+            exerciseId: "cat-cow",
+            sets: 2,
+            reps: "10",
+            restSec: 30,
+            intensity: { type: "rpe", value: 3 },
+          },
+        ],
+      },
+      {
+        blockType: "strength",
+        durationMin: 35,
+        exercises: focusExercises.map((ex) => ({
+          exerciseSlug: ex.slug,
+          exerciseId: ex.slug,
+          sets: 3,
+          reps: "8-12",
+          restSec: 60,
+          intensity: { type: "rpe", value: 7 },
+        })),
+      },
+      {
+        blockType: "cooldown",
+        durationMin: 5,
+        exercises: [
+          {
+            exerciseSlug: "plank",
+            exerciseId: "plank",
+            sets: 2,
+            reps: "30s",
+            restSec: 30,
+            intensity: { type: "rpe", value: 5 },
+          },
+        ],
+      },
+    ],
   };
 }
 
