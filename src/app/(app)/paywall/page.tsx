@@ -67,14 +67,18 @@ export default function PaywallPage() {
   const handleSelect = async (tierId: string) => {
     setLoading(tierId);
     
-    if (tierId === "free") {
-      // Free tier - just go to plan
-      router.push("/plan");
-    } else {
-      // For now, simulate payment and go to plan
-      // In production, this would redirect to Stripe/PayPal
-      await new Promise(resolve => setTimeout(resolve, 500));
-      router.push("/plan");
+    try {
+      // First, ensure user has a profile (create default if not)
+      const profileRes = await fetch("/api/profile/ensure", { method: "POST" });
+      if (!profileRes.ok) {
+        console.error("Failed to ensure profile");
+      }
+      
+      // Go to plan generation (which will create the plan)
+      router.push("/plan/generate");
+    } catch (error) {
+      console.error("Error:", error);
+      router.push("/plan/generate");
     }
   };
 

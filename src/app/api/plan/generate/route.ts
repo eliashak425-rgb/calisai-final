@@ -13,15 +13,41 @@ export async function POST() {
     }
 
     // Get the user's active training profile
-    const profile = await prisma.trainingProfile.findFirst({
+    let profile = await prisma.trainingProfile.findFirst({
       where: { userId: session.user.id, isActive: true },
     });
 
+    // If no profile exists, create a default beginner profile
     if (!profile) {
-      return NextResponse.json(
-        { error: "No active profile. Please complete the assessment first." },
-        { status: 400 }
-      );
+      profile = await prisma.trainingProfile.create({
+        data: {
+          userId: session.user.id,
+          version: 1,
+          isActive: true,
+          age: 25,
+          biologicalSex: "male",
+          heightCm: 175,
+          weightKg: 70,
+          trainingAge: "beginner",
+          daysPerWeek: 3,
+          sessionDurationMin: 45,
+          preferredTime: "morning",
+          trainingLocation: "home",
+          equipment: JSON.stringify({ pull_up_bar: false, dip_station: false, rings: false, parallettes: false, resistance_bands: false }),
+          goalPrimary: "general_fitness",
+          hasCurrentPain: false,
+          painAreas: "[]",
+          avoidTags: "[]",
+          maxPushups: "5",
+          maxPullups: "0",
+          maxDips: "0",
+          plankHoldSec: 30,
+          hollowHoldSec: "10",
+          wallHandstandHoldSec: "0",
+          fitnessLevel: "beginner",
+          flags: "[]",
+        },
+      });
     }
 
     // Check if there's already an active plan

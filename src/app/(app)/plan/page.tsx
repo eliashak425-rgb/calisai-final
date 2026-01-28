@@ -31,19 +31,8 @@ interface WorkoutDay {
 export default async function PlanPage() {
   const user = await requireAuth();
 
-  // Check subscription status
-  const subscription = await prisma.subscription.findFirst({
-    where: {
-      userId: user.id,
-      status: "ACTIVE",
-      currentPeriodEnd: { gt: new Date() },
-    },
-  });
-
-  if (!subscription) {
-    redirect("/subscribe");
-  }
-
+  // Note: Subscription check removed for now - allowing free users to access their plans
+  
   const plan = await prisma.workoutPlan.findFirst({
     where: { userId: user.id, isActive: true },
     include: {
@@ -81,28 +70,8 @@ export default async function PlanPage() {
   const completedDayIds = new Set(completedWorkouts.map(w => w.dayId));
 
   if (!plan) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-neutral-900 ring-1 ring-neutral-800 flex items-center justify-center">
-            <svg className="w-10 h-10 text-neutral-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-semibold text-white mb-3">No Active Plan</h1>
-          <p className="text-neutral-400 mb-8">Complete your assessment to get a personalized workout plan.</p>
-          <Link
-            href="/assessment"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-400 hover:to-emerald-500 transition-all"
-          >
-            Start Assessment
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14m-7-7l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
-        </div>
-      </div>
-    );
+    // No plan exists - redirect to plan generation
+    redirect("/plan/generate");
   }
 
   // Calculate stats
