@@ -29,29 +29,11 @@ function LoginForm() {
     setError("");
     setGoogleLoading(true);
     try {
-      const result = await signIn("google", { 
-        callbackUrl,
-        redirect: false 
-      });
-      
-      console.log("Google sign-in result:", result);
-      
-      if (result?.error) {
-        if (result.error === "OAuthAccountNotLinked") {
-          setError("This email is already registered with a different sign-in method.");
-        } else if (result.error === "Configuration") {
-          setError("Google sign-in is not configured. Please use email/password.");
-        } else {
-          setError(`Google sign-in failed: ${result.error}`);
-        }
-      } else if (result?.url) {
-        // Redirect to Google OAuth
-        window.location.href = result.url;
-      }
+      // Use redirect: true (default) for proper OAuth flow
+      await signIn("google", { callbackUrl });
     } catch (err) {
       console.error("Google sign-in error:", err);
       setError("Failed to start Google sign-in. Please try again.");
-    } finally {
       setGoogleLoading(false);
     }
   };
