@@ -46,7 +46,7 @@ const plans = [
       { text: "Priority support", included: true },
       { text: "Export workout data", included: true },
     ],
-    cta: "Start 7-Day Free Trial",
+    cta: "Get Pro",
     href: "/assessment?plan=pro",
     highlighted: true,
     badge: "MOST POPULAR",
@@ -72,7 +72,7 @@ const plans = [
       { text: "API access", included: true },
       { text: "Dedicated support", included: true },
     ],
-    cta: "Start Free Trial",
+    cta: "Get Elite",
     href: "/assessment?plan=elite",
     highlighted: false,
     icon: (

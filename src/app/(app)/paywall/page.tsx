@@ -12,7 +12,7 @@ const PRICING_TIERS = [
     name: "Starter",
     price: 15,
     originalPrice: 50,
-    description: "Most popular",
+    description: "Perfect for beginners",
     features: [
       "Full 30-day plan",
       "50 AI messages/day",
@@ -21,7 +21,7 @@ const PRICING_TIERS = [
       "All exercises",
     ],
     cta: "Get Started",
-    popular: true,
+    popular: false,
   },
   {
     id: "pro",
@@ -37,6 +37,22 @@ const PRICING_TIERS = [
       "Priority support",
     ],
     cta: "Go Pro",
+    popular: true,
+  },
+  {
+    id: "elite",
+    name: "Elite",
+    price: 79,
+    originalPrice: 199,
+    description: "For coaches & pros",
+    features: [
+      "Everything in Pro",
+      "Manage up to 25 clients",
+      "White-label reports",
+      "Client progress dashboard",
+      "API access",
+    ],
+    cta: "Go Elite",
     popular: false,
   },
 ];
@@ -48,6 +64,7 @@ function PaywallContent() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [checkingProfile, setCheckingProfile] = useState(true);
   
   const expired = searchParams.get("expired") === "true";
 
@@ -55,6 +72,30 @@ function PaywallContent() {
     if (status === "unauthenticated") {
       router.push("/login");
     }
+  }, [status, router]);
+
+  // Check if user has completed assessment
+  useEffect(() => {
+    async function checkProfile() {
+      if (status !== "authenticated") return;
+      
+      try {
+        const response = await fetch("/api/profile/check");
+        const data = await response.json();
+        
+        if (!data.hasProfile) {
+          // User hasn't completed assessment, redirect them
+          router.push("/assessment");
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check profile:", err);
+      }
+      
+      setCheckingProfile(false);
+    }
+    
+    checkProfile();
   }, [status, router]);
 
   const createOrder = async (planId: string) => {
@@ -108,7 +149,7 @@ function PaywallContent() {
     }
   };
 
-  if (status === "loading") {
+  if (status === "loading" || checkingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -120,7 +161,7 @@ function PaywallContent() {
 
   return (
     <div className="min-h-screen py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Background */}
         <div className="absolute top-0 left-0 w-full h-[600px] bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.15),transparent_60%)] pointer-events-none -z-10" />
 
@@ -156,7 +197,7 @@ function PaywallContent() {
         )}
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {PRICING_TIERS.map((tier) => (
             <div
               key={tier.id}

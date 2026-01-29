@@ -4,8 +4,8 @@ import { authOptions } from "@/lib/auth";
 
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
-// Always use sandbox for now - switch to production URL when ready for live payments
-const PAYPAL_API_URL = "https://api-m.sandbox.paypal.com";
+// Live PayPal API URL
+const PAYPAL_API_URL = "https://api-m.paypal.com";
 
 function getBaseUrl(): string {
   if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
@@ -16,6 +16,7 @@ function getBaseUrl(): string {
 const PRICING = {
   starter: { price: "15.00", name: "CalisAI Starter", tier: "BASIC" },
   pro: { price: "29.00", name: "CalisAI Pro", tier: "PREMIUM" },
+  elite: { price: "79.00", name: "CalisAI Elite", tier: "ELITE" },
 };
 
 async function getPayPalAccessToken(): Promise<string> {
