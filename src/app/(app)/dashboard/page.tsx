@@ -181,37 +181,59 @@ export default async function DashboardPage() {
               )}
             </div>
 
-            {/* Week Overview */}
-            <div className="card-interactive p-6 mb-8">
-              <h2 className="text-xl font-display font-medium text-white mb-4">This Week</h2>
-              <div className="grid grid-cols-7 gap-2">
+            {/* Week Overview - Redesigned */}
+            <div className="card-interactive p-6 mb-8 overflow-hidden">
+              <h2 className="text-xl font-display font-medium text-white mb-5">This Week</h2>
+              
+              {/* Horizontal scrollable on mobile, grid on desktop */}
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory scrollbar-hide md:grid md:grid-cols-7 md:gap-3 md:overflow-visible md:pb-0">
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => {
                   const dayNum = index + 1;
                   const workout = plan.days.find((d) => d.dayNumber === dayNum);
                   const isToday = dayOfWeek === (dayNum === 7 ? 0 : dayNum);
+                  const isRest = !workout || workout.dayType === "rest";
                   
                   return (
                     <div
                       key={day}
-                      className={`p-3 rounded-xl text-center transition-all cursor-pointer hover:scale-105 ${
+                      className={`flex-shrink-0 w-20 md:w-auto snap-center p-4 rounded-2xl text-center transition-all duration-300 cursor-pointer group ${
                         isToday
-                          ? "bg-emerald-500/20 border-2 border-emerald-500 shadow-lg shadow-emerald-500/20"
-                          : "bg-white/[0.02] border border-white/5 hover:border-white/10"
+                          ? "bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 ring-2 ring-emerald-500 shadow-lg shadow-emerald-500/20"
+                          : "bg-white/[0.02] ring-1 ring-white/5 hover:ring-white/10 hover:bg-white/[0.04]"
                       }`}
                     >
-                      <div className={`text-xs font-medium ${isToday ? "text-emerald-400" : "text-slate-500"}`}>
+                      {/* Day name */}
+                      <div className={`text-xs font-semibold uppercase tracking-wider mb-2 ${
+                        isToday ? "text-emerald-400" : "text-slate-500"
+                      }`}>
                         {day}
                       </div>
-                      <div className={`text-xl mt-1 ${isToday ? "text-white" : "text-slate-400"}`}>
-                        {workout ? (
-                          workout.dayType === "rest" ? "🧘" : "💪"
-                        ) : (
-                          "🧘"
-                        )}
+                      
+                      {/* Icon */}
+                      <div className={`text-3xl mb-2 transition-transform duration-300 group-hover:scale-110 ${
+                        isToday ? "animate-pulse" : ""
+                      }`}>
+                        {isRest ? "🧘" : "💪"}
                       </div>
-                      {workout && workout.dayType !== "rest" && (
-                        <div className="text-[10px] text-slate-500 mt-1 capitalize truncate">
-                          {workout.dayType.replace("_", " ")}
+                      
+                      {/* Workout type or rest */}
+                      <div className={`text-[11px] font-medium capitalize ${
+                        isToday 
+                          ? "text-emerald-300" 
+                          : isRest 
+                            ? "text-slate-600"
+                            : "text-slate-400"
+                      }`}>
+                        {isRest ? "Rest" : workout?.dayType.replace("_", " ")}
+                      </div>
+                      
+                      {/* Today indicator dot */}
+                      {isToday && (
+                        <div className="mt-2 flex justify-center">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
                         </div>
                       )}
                     </div>

@@ -327,7 +327,7 @@ export default function WorkoutPage() {
   const targetReps = parseInt(currentExercise?.reps || "10") || 10;
 
   return (
-    <div className="min-h-screen bg-neutral-950 pb-32">
+    <div className="min-h-screen bg-neutral-950 pb-44 md:pb-32">
       {/* Audio for timer end */}
       <audio ref={audioRef} preload="auto">
         <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2EhX19e3p7fH1+f4CCgoOEhYaHiImJiomJiIeGhYSDgX9+fXx7enp6enp7fH1+f4GCg4SFhoaHiImJiYmIh4aFhIOCgH9+fXx7enp5eXl5eXp7fH1+f4GCg4SFhoaHh4iIiIiHhoWEg4KBf35" type="audio/wav"/>
@@ -446,20 +446,40 @@ export default function WorkoutPage() {
 
       <div className="pt-24 px-4">
         <div className="max-w-lg mx-auto">
-          {/* Exercise Info */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2 capitalize">
+          {/* Exercise Info with animation */}
+          <div className="text-center mb-8 animate-fade-in">
+            <h1 className="text-3xl font-bold text-white mb-3 capitalize animate-slide-down">
               {currentExercise?.exercise?.name || currentExercise?.exerciseId.replace(/_/g, " ")}
             </h1>
-            <div className="flex items-center justify-center gap-4 text-neutral-400">
-              <span className="text-lg">{currentExercise?.sets} × {currentExercise?.reps}</span>
-              <span className="w-1 h-1 rounded-full bg-neutral-600" />
-              <span>{intensity?.type.toUpperCase()} {intensity?.value}</span>
+            
+            {/* Stats badges */}
+            <div className="flex items-center justify-center gap-3 flex-wrap mb-4">
+              <span className="px-4 py-1.5 rounded-full bg-neutral-800 text-white font-semibold text-sm">
+                {currentExercise?.sets} × {currentExercise?.reps}
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-neutral-800/50 text-neutral-400 text-sm">
+                {intensity?.type.toUpperCase()} {intensity?.value}
+              </span>
             </div>
-            {/* Completion status */}
-            <div className="mt-3 text-sm">
-              <span className={completedSets === currentExercise?.sets ? "text-emerald-400" : "text-neutral-500"}>
-                {completedSets} / {currentExercise?.sets} sets completed
+            
+            {/* Completion progress ring */}
+            <div className="flex items-center justify-center gap-3">
+              <div className="relative w-8 h-8">
+                <svg className="w-full h-full -rotate-90">
+                  <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" strokeWidth="3" className="text-neutral-800" />
+                  <circle 
+                    cx="16" cy="16" r="12" fill="none" stroke="currentColor" strokeWidth="3" 
+                    strokeLinecap="round"
+                    strokeDasharray={75}
+                    strokeDashoffset={75 - (75 * (completedSets / (currentExercise?.sets || 1)))}
+                    className="text-emerald-500 transition-all duration-500"
+                  />
+                </svg>
+              </div>
+              <span className={`text-sm font-medium transition-colors ${
+                completedSets === currentExercise?.sets ? "text-emerald-400" : "text-neutral-400"
+              }`}>
+                {completedSets} / {currentExercise?.sets} sets done
               </span>
             </div>
           </div>
@@ -484,63 +504,67 @@ export default function WorkoutPage() {
             </div>
           )}
 
-          {/* Set Tracking */}
+          {/* Set Tracking with animations */}
           <div className="space-y-3 mb-8">
             {currentLog?.sets.map((set, idx) => (
               <div
                 key={idx}
-                className={`rounded-2xl p-4 transition-all ${
+                style={{ animationDelay: `${idx * 100}ms` }}
+                className={`rounded-2xl p-5 transition-all duration-300 animate-slide-up ${
                   set.completed
-                    ? "bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                    ? "bg-gradient-to-r from-emerald-500/10 to-emerald-600/5 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-500/10"
                     : activeSetIndex === idx
-                    ? "bg-neutral-800 ring-2 ring-emerald-500"
-                    : "bg-neutral-900 ring-1 ring-neutral-800"
+                    ? "bg-neutral-800 ring-2 ring-emerald-500 shadow-lg shadow-emerald-500/20"
+                    : "bg-neutral-900/80 ring-1 ring-neutral-800 hover:ring-neutral-700"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold ${
+                    {/* Set number badge with animation */}
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold transition-all duration-300 ${
                       set.completed 
-                        ? "bg-emerald-500 text-white" 
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-105" 
                         : "bg-neutral-800 text-neutral-400"
                     }`}>
                       {set.completed ? (
-                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <svg className="w-7 h-7 animate-scale-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                           <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       ) : (
-                        set.setNumber
+                        <span className="text-xl">{set.setNumber}</span>
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-white">Set {set.setNumber}</div>
-                      <div className="text-sm text-neutral-500">
-                        {set.completed ? `${set.reps} reps completed` : `Target: ${currentExercise?.reps}`}
+                      <div className="font-semibold text-white text-lg">Set {set.setNumber}</div>
+                      <div className={`text-sm transition-colors ${set.completed ? "text-emerald-400" : "text-neutral-500"}`}>
+                        {set.completed ? `✓ ${set.reps} reps logged` : `Target: ${currentExercise?.reps} reps`}
                       </div>
                     </div>
                   </div>
 
+                  {/* Log Set Button - larger and more prominent */}
                   {!set.completed && activeSetIndex !== idx && (
                     <button
                       onClick={() => {
                         setActiveSetIndex(idx);
                         setCustomReps(targetReps);
                       }}
-                      className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors"
+                      className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-emerald-400 hover:to-emerald-500 active:scale-95 transition-all shadow-lg shadow-emerald-500/25"
                     >
                       Log Set
                     </button>
                   )}
 
+                  {/* Rep editor - expanded when active */}
                   {!set.completed && activeSetIndex === idx && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 animate-scale-in">
                       {/* Rep selector with +/- buttons */}
-                      <div className="flex items-center bg-neutral-800 rounded-xl overflow-hidden">
+                      <div className="flex items-center bg-neutral-700 rounded-xl overflow-hidden ring-2 ring-emerald-500/50">
                         <button
                           onClick={() => setCustomReps(Math.max(1, customReps - 1))}
-                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-neutral-700 transition-colors"
+                          className="w-12 h-12 flex items-center justify-center text-white hover:bg-neutral-600 active:bg-neutral-500 transition-colors"
                         >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                             <path d="M5 12h14" strokeLinecap="round"/>
                           </svg>
                         </button>
@@ -548,29 +572,31 @@ export default function WorkoutPage() {
                           type="number"
                           value={customReps}
                           onChange={(e) => setCustomReps(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-14 h-10 bg-transparent text-center text-white text-xl font-bold focus:outline-none"
+                          className="w-16 h-12 bg-transparent text-center text-white text-2xl font-bold focus:outline-none"
                         />
                         <button
                           onClick={() => setCustomReps(customReps + 1)}
-                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-neutral-700 transition-colors"
+                          className="w-12 h-12 flex items-center justify-center text-white hover:bg-neutral-600 active:bg-neutral-500 transition-colors"
                         >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                             <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
                           </svg>
                         </button>
                       </div>
                       <button
                         onClick={() => logSet(idx, customReps)}
-                        className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-400 transition-colors"
+                        className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-400 hover:to-emerald-500 active:scale-95 transition-all shadow-lg shadow-emerald-500/30"
                       >
-                        Done
+                        ✓ Done
                       </button>
                     </div>
                   )}
 
+                  {/* Completed badge */}
                   {set.completed && (
-                    <div className="text-emerald-400 font-semibold text-lg">
-                      {set.reps} reps
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-lg animate-scale-in">
+                      <span className="text-2xl">{set.reps}</span>
+                      <span className="text-sm font-normal text-emerald-500">reps</span>
                     </div>
                   )}
                 </div>
@@ -590,23 +616,23 @@ export default function WorkoutPage() {
         </div>
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/90 backdrop-blur-lg border-t border-neutral-800 p-4">
+      {/* Bottom Navigation - positioned above mobile app nav */}
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-800 p-4 safe-area-pb">
         <div className="max-w-lg mx-auto flex gap-3">
           <button
             onClick={prevExercise}
             disabled={currentExerciseIndex === 0}
-            className="flex-1 py-4 bg-neutral-800 text-white rounded-xl font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700 transition-colors"
+            className="flex-1 py-4 bg-neutral-800 text-white rounded-xl font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700 active:scale-[0.98] transition-all"
           >
             ← Previous
           </button>
           <button
             onClick={nextExercise}
             disabled={!allSetsCompleted}
-            className={`flex-1 py-4 rounded-xl font-semibold transition-all shadow-lg ${
+            className={`flex-1 py-4 rounded-xl font-semibold transition-all active:scale-[0.98] ${
               allSetsCompleted
-                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/25"
-                : "bg-neutral-800 text-neutral-500 cursor-not-allowed shadow-none"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 shadow-lg shadow-emerald-500/30"
+                : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
             }`}
           >
             {!allSetsCompleted ? (
@@ -618,7 +644,7 @@ export default function WorkoutPage() {
                 Complete all sets
               </span>
             ) : currentExerciseIndex === allExercises.length - 1 ? (
-              "Finish Workout"
+              "Finish Workout 🎉"
             ) : (
               "Next Exercise →"
             )}
