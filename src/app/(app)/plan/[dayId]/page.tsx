@@ -1,6 +1,6 @@
 import { requireSubscription } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic';
