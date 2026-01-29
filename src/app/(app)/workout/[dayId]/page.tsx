@@ -122,14 +122,15 @@ export default function WorkoutPage() {
     fetchWorkout();
   }, [dayId, router]);
 
-  // Initialize custom reps when exercise changes
+  // Initialize custom reps when exercise changes (use index, not object reference)
   useEffect(() => {
     if (currentExercise) {
       const baseReps = parseInt(currentExercise.reps) || 10;
       setCustomReps(baseReps);
       setActiveSetIndex(null);
     }
-  }, [currentExercise]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentExerciseIndex]); // Only reset when moving to a different exercise
 
   // Rest timer countdown with audio
   useEffect(() => {
