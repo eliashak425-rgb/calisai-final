@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { Logo } from "@/components/ui/Logo";
 
 export function Navbar() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const isLoading = status === "loading";
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4">
@@ -30,7 +31,11 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 pr-1">
-          {session ? (
+          {isLoading ? (
+            <div className="px-5 py-2.5 rounded-full bg-white/10 text-transparent text-xs font-semibold animate-pulse">
+              Loading...
+            </div>
+          ) : session ? (
             <Link
               href="/dashboard"
               className="px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-xs font-semibold transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2"

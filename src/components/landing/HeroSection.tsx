@@ -129,7 +129,7 @@ export function HeroSection() {
       </div>
 
       {/* Right Visual: Interactive Widget */}
-      <div className="animate-on-scroll opacity-0 relative perspective-distant group">
+      <div className="animate-on-scroll opacity-0 relative perspective-distant group hidden lg:block">
         {/* Glow */}
         <div className="absolute inset-0 bg-emerald-500/20 blur-[120px] rounded-full opacity-40 group-hover:opacity-60 transition-opacity duration-700" />
 

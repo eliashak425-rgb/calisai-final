@@ -12,7 +12,7 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="relative">
+    <div className="relative overflow-x-hidden">
       {/* Noise overlay for texture */}
       <div className="noise-overlay fixed inset-0 pointer-events-none z-50" />
       
