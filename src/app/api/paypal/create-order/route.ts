@@ -7,6 +7,12 @@ const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 // Always use sandbox for now - switch to production URL when ready for live payments
 const PAYPAL_API_URL = "https://api-m.sandbox.paypal.com";
 
+function getBaseUrl(): string {
+  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "https://calisai-final-git-main-eliashak425s-projects.vercel.app";
+}
+
 const PRICING = {
   starter: { price: "15.00", name: "CalisAI Starter", tier: "BASIC" },
   pro: { price: "29.00", name: "CalisAI Pro", tier: "PREMIUM" },
@@ -89,8 +95,8 @@ export async function POST(req: Request) {
           brand_name: "CalisAI",
           landing_page: "NO_PREFERENCE",
           user_action: "PAY_NOW",
-          return_url: `${process.env.NEXTAUTH_URL}/paywall/success`,
-          cancel_url: `${process.env.NEXTAUTH_URL}/paywall`,
+          return_url: `${getBaseUrl()}/paywall/success`,
+          cancel_url: `${getBaseUrl()}/paywall`,
         },
       }),
     });
