@@ -74,29 +74,40 @@ function PaywallContent() {
     }
   }, [status, router]);
 
-  // Check if user has completed assessment
+  // Check if user has completed assessment and subscription status
   useEffect(() => {
-    async function checkProfile() {
+    async function checkUserStatus() {
       if (status !== "authenticated") return;
       
       try {
-        const response = await fetch("/api/profile/check");
-        const data = await response.json();
+        // First check if user has an active subscription
+        const subResponse = await fetch("/api/subscription/check");
+        const subData = await subResponse.json();
         
-        if (!data.hasProfile) {
+        if (subData.hasSubscription && !expired) {
+          // User already has a subscription, go to plan
+          router.push("/plan");
+          return;
+        }
+
+        // Then check if user has completed assessment
+        const profileResponse = await fetch("/api/profile/check");
+        const profileData = await profileResponse.json();
+        
+        if (!profileData.hasProfile) {
           // User hasn't completed assessment, redirect them
           router.push("/assessment");
           return;
         }
       } catch (err) {
-        console.error("Failed to check profile:", err);
+        console.error("Failed to check user status:", err);
       }
       
       setCheckingProfile(false);
     }
     
-    checkProfile();
-  }, [status, router]);
+    checkUserStatus();
+  }, [status, router, expired]);
 
   const createOrder = async (planId: string) => {
     try {

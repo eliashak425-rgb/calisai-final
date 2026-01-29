@@ -4,6 +4,7 @@ import { Logo } from "@/components/ui/Logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -12,14 +13,46 @@ const navLinks = [
   { href: "/chat", label: "AI Coach" },
 ];
 
+const TIER_COLORS: Record<string, string> = {
+  BASIC: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  PREMIUM: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  ELITE: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+};
+
+const TIER_NAMES: Record<string, string> = {
+  BASIC: "Starter",
+  PREMIUM: "Pro",
+  ELITE: "Elite",
+};
+
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const user = session?.user;
+  const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
+
+  // Fetch subscription tier
+  useEffect(() => {
+    async function fetchSubscription() {
+      if (status !== "authenticated") return;
+      
+      try {
+        const response = await fetch("/api/subscription/check");
+        const data = await response.json();
+        if (data.hasSubscription) {
+          setSubscriptionTier(data.tier);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subscription:", err);
+      }
+    }
+    
+    fetchSubscription();
+  }, [status]);
 
   // Get user initials for avatar
   const initials = user?.name
@@ -64,9 +97,16 @@ export default function AppLayout({
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-xs font-semibold text-white">
                   {initials}
                 </div>
-                <span className="text-sm text-slate-400 hidden sm:block">
-                  {user?.name || user?.email}
-                </span>
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="text-sm text-slate-400">
+                    {user?.name || user?.email}
+                  </span>
+                  {subscriptionTier && (
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${TIER_COLORS[subscriptionTier] || TIER_COLORS.BASIC}`}>
+                      {TIER_NAMES[subscriptionTier] || subscriptionTier}
+                    </span>
+                  )}
+                </div>
               </div>
               <Link
                 href="/settings"
