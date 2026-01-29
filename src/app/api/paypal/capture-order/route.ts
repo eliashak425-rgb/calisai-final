@@ -107,14 +107,18 @@ export async function POST(req: Request) {
     const currentPeriodEnd = new Date();
     currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
 
+    const captureId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || orderId;
+    
     const subscription = await prisma.subscription.create({
       data: {
         userId: session.user.id,
         tier: orderData.tier,
         status: "ACTIVE",
         currentPeriodEnd,
+        paypalSubscriptionId: `order_${orderId}`, // Using order ID since this is a one-time payment
+        paypalPlanId: orderData.planId,
         paypalOrderId: orderId,
-        paypalCaptureId: captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+        paypalCaptureId: captureId,
       },
     });
 
