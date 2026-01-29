@@ -39,20 +39,29 @@ async function getPayPalAccessToken(): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  console.log("=== PayPal Create Order Start ===");
+  console.log("PAYPAL_CLIENT_ID exists:", !!PAYPAL_CLIENT_ID);
+  console.log("PAYPAL_SECRET exists:", !!PAYPAL_SECRET);
+  
   try {
     const session = await getServerSession(authOptions);
+    console.log("Session user:", session?.user?.id ? "Found" : "Not found");
+    
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { planId } = await req.json();
+    console.log("Plan ID:", planId);
 
     if (!planId || !PRICING[planId as keyof typeof PRICING]) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
 
     const plan = PRICING[planId as keyof typeof PRICING];
+    console.log("Getting PayPal access token...");
     const accessToken = await getPayPalAccessToken();
+    console.log("Access token received:", !!accessToken);
 
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
       method: "POST",
@@ -87,20 +96,23 @@ export async function POST(req: Request) {
     });
 
     const order = await response.json();
+    console.log("PayPal response status:", response.status);
+    console.log("PayPal order response:", JSON.stringify(order, null, 2));
 
     if (!response.ok) {
       console.error("PayPal create order error:", order);
       return NextResponse.json(
-        { error: "Failed to create PayPal order" },
+        { error: `PayPal error: ${order.message || order.error_description || "Unknown error"}` },
         { status: 500 }
       );
     }
 
+    console.log("Order created successfully:", order.id);
     return NextResponse.json({ orderId: order.id });
   } catch (error) {
     console.error("Create order error:", error);
     return NextResponse.json(
-      { error: "Failed to create order" },
+      { error: `Server error: ${error instanceof Error ? error.message : "Unknown error"}` },
       { status: 500 }
     );
   }
