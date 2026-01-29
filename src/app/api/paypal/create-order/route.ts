@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
-const PAYPAL_API_URL = process.env.NODE_ENV === "production" 
-  ? "https://api-m.paypal.com" 
-  : "https://api-m.sandbox.paypal.com";
+// Always use sandbox for now - switch to production URL when ready for live payments
+const PAYPAL_API_URL = "https://api-m.sandbox.paypal.com";
 
 const PRICING = {
   starter: { price: "15.00", name: "CalisAI Starter", tier: "BASIC" },
